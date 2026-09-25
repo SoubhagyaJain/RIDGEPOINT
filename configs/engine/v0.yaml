@@ -1,0 +1,7 @@
+version: v0
+model: Qwen/Qwen2.5-1.5B-Instruct
+dtype: bfloat16
+max_model_len: 4096
+kv_block_size: 16
+kv_pool_gib_initial_estimate: 1.0
+notes: Baseline implementation begins in Phase 2; this is a planning configuration.

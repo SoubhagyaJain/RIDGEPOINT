@@ -1,0 +1,5 @@
+name: W-decode
+base: chat.yaml
+prompt_len: {dist: uniform_int, min: 64, max: 256}
+output_len: {dist: uniform_int, min: 512, max: 1024}
+shared_prefix: null

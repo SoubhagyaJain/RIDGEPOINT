@@ -1,0 +1,6 @@
+name: W-overload
+base: chat.yaml
+offered_load_multipliers: [1.5, 2.0]
+overload_duration_s: 120
+recovery_duration_s: 120
+capacity_reference: measured_W_chat_capacity

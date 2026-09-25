@@ -1,0 +1,5 @@
+name: W-prefill
+base: chat.yaml
+prompt_len: {dist: uniform_int, min: 1536, max: 3072}
+output_len: {dist: uniform_int, min: 64, max: 256}
+shared_prefix: null

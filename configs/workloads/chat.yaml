@@ -1,0 +1,11 @@
+name: W-chat
+seed: 1234
+duration_s: 300
+warmup_s: 30
+arrival: {process: poisson, rate_rps: 2.0}
+prompt_len: {dist: lognormal, median: 300, sigma: 0.8, min: 16, max: 2048}
+output_len: {dist: lognormal, median: 200, sigma: 0.7, min: 8, max: 1024}
+ignore_eos: true
+shared_prefix: {num_prefixes: 4, prefix_len: 400, fraction: 0.5, popularity: zipf, zipf_s: 1.1}
+sampling: {temperature: 0.0}
+slo: {ttft_ms: 1000, tpot_ms: 75}
