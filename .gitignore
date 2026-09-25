@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.egg-info/
+results/raw/*
+!results/raw/.gitkeep
+/models/
+weights/
+*.safetensors
+*.bin
+*.gguf
+notebook-extract.txt
+.coverage

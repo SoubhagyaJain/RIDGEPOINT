@@ -1,0 +1,3 @@
+name: W-burst
+base: chat.yaml
+burst: {period_s: 30, active_s: 5, extra_long_prompt_rate_rps: 2.0, prompt_tokens: 2048}

@@ -1,0 +1,3 @@
+name: W-multiturn
+base: chat.yaml
+sessions: {turns_min: 3, turns_max: 8, think_time: {dist: exponential, mean_s: 5}}
