@@ -1,7 +1,7 @@
 # Status
 
-- Current phase: 1 complete; waiting for the user to say "continue" before Phase 2.
-- Completed: locked CUDA environment, official model config, memory calculator, passing BF16 GPU check, four unit tests, clean lint, E1 smoke and three full microbenchmark runs, memory budget, six initial workloads, SLO and measurement definitions, and teaching report.
-- Phase 1 measurements: 148.9 GB/s 128 MiB device copy, 24.92 TFLOP/s BF16 4096 GEMM, 3.76 µs tiny PyTorch add (median of three run medians). See `results/summaries/e1-phase1.md`.
-- Limitations: Windows/WDDM E1 is exploratory without continuous clock logging; model-loading activation peak and safe KV pool remain to be measured. Native Linux is not the current host.
-- Next: Phase 2 V0 Hugging Face streaming server and repeatable benchmark harness, after user approval to continue.
+- Current phase: 2 complete; wait for the user to say "continue" before Phase 3.
+- Completed: V0 BF16 Hugging Face streaming server, pinned/verified model download, validation/request IDs/timings, seeded token-ID trace generator, open-loop client, async null backend, raw-record analysis, 10 passing tests, clean lint, real streamed answer, three repeated V0 smoke runs, and 500-stream null check.
+- Measured V0 smoke: six fixed requests per trial at 0.3 offered req/s; 6/6 completions in each; goodput 0.25 req/s in all three trials. This is exploratory due small sample, Windows/WDDM, and absent continuous clock trace. See `results/summaries/phase2-v0.md`.
+- Open limits: 500 simultaneous null streams had send-lag P99 of 16.91 ms, above the 5 ms goal. vLLM native Windows is unsupported, and WSL2 currently fails to mount its missing virtual disk. A safe owned KV pool and valid capacity comparison remain later-phase work.
+- Next: Phase 3 owned Qwen2 forward pass, contiguous KV, numerical checks, and static/short-window batching after the user says "continue".
