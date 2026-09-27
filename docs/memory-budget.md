@@ -51,3 +51,7 @@ uv run --frozen python -m ridgepoint.hardware
 ```
 
 `parameters`, `weight_bytes`, `kv_bytes_per_token`, `block_bytes`, and `usable_tokens` should match the arithmetic above. The hardware command reports current CUDA free bytes, which will vary.
+
+## Phase 2 observation after loading V0
+
+On 2026-09-27, a direct V0 load of the pinned Qwen2.5-1.5B-Instruct safetensors on this Windows RTX 4050 reported `torch.cuda.memory_allocated() = 3,088,346,624 B` and `torch.cuda.mem_get_info().free = 2,033,188,864 B` immediately after load. The allocated value is close to the architecture-derived BF16 weight size, with a small extra allocation. The free value includes current background/WDDM conditions and is not a safe KV allocation by itself. V0's dynamic Hugging Face KV and activation peaks were not profiled; the explicit Ridgepoint KV pool is still provisional until Phase 3/5 profiling.

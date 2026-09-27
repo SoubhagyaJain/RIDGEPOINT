@@ -1,0 +1,7 @@
+The observatory opened before sunrise. Engineers checked the cooling fans, read the temperature gauges, and compared yesterday's measurements with the new run. A small change in room temperature could shift the result, so they recorded the conditions before drawing a conclusion.
+
+At the library, a student asked why a computer sometimes pauses before answering. The teacher drew a queue of requests and explained that each answer needs time on the same processor. As the queue grows, the last person waits longer even if their question is short.
+
+A field notebook records what was planned, what actually happened, and what remains uncertain. Measurements include units, timestamps, and the equipment used. Estimates are useful for planning, but they become evidence only after an experiment checks them.
+
+In the workshop, two teams used the same materials to build different machines. They compared the machines with identical tasks and a shared clock. When one machine was faster, they could explain which part of its design made the difference.
