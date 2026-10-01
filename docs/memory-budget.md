@@ -55,3 +55,9 @@ uv run --frozen python -m ridgepoint.hardware
 ## Phase 2 observation after loading V0
 
 On 2026-09-27, a direct V0 load of the pinned Qwen2.5-1.5B-Instruct safetensors on this Windows RTX 4050 reported `torch.cuda.memory_allocated() = 3,088,346,624 B` and `torch.cuda.mem_get_info().free = 2,033,188,864 B` immediately after load. The allocated value is close to the architecture-derived BF16 weight size, with a small extra allocation. The free value includes current background/WDDM conditions and is not a safe KV allocation by itself. V0's dynamic Hugging Face KV and activation peaks were not profiled; the explicit Ridgepoint KV pool is still provisional until Phase 3/5 profiling.
+
+## Phase 3 contiguous-cache guard
+
+V1 allocates one contiguous `[layer, K/V, batch, KV head, position, head width]` tensor per frozen batch. Its byte estimate is `2 × 28 × batch × 2 × capacity × 128 × 2`, where capacity is the largest `prompt_tokens + max_tokens` in that batch. For a four-request batch with capacity 80, this is **9,175,040 bytes**; the number follows from the model geometry and is not a memory measurement.
+
+The default configuration caps predicted KV bytes at **512 MiB** and requires **512 MiB** of free/reclaimable GPU headroom before allocation. A request that fails its individual preflight gets HTTP 503; the worker splits a collected batch when its aggregate predicted KV exceeds the allowance. These are conservative settings, not a measured safe pool size. Actual PyTorch allocator reservations, prefill activations, and Windows background usage still vary. Phase 5 will replace this guard with owned block accounting and admission.

@@ -1,0 +1,8 @@
+version: v1
+model: Qwen/Qwen2.5-1.5B-Instruct
+dtype: bfloat16
+max_model_len: 4096
+max_batch_size: 4
+batch_window_ms: 10
+kv_cap_mib: 512
+free_reserve_mib: 512

@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
 from ridgepoint.baseline.hf_backend import HFBackend
+from ridgepoint.runtime.backend import CapacityError
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,7 +56,12 @@ def create_app(backend=None) -> FastAPI:
         if isinstance(active, HFBackend):
             await asyncio.to_thread(active.load)
         app.state.backend = active
-        yield
+        try:
+            yield
+        finally:
+            close = getattr(active, "close", None)
+            if close is not None:
+                await close()
 
     app = FastAPI(title="Ridgepoint V0", lifespan=lifespan)
 
@@ -76,6 +82,12 @@ def create_app(backend=None) -> FastAPI:
             prepared = active.prepare(body.prompt, body.prompt_ids, body.max_tokens)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+        preflight = getattr(active, "preflight", None)
+        if preflight is not None:
+            try:
+                preflight(prepared, body.max_tokens)
+            except CapacityError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
         request_id = uuid.uuid4().hex
         LOGGER.info("request accepted id=%s prompt_tokens=%s max_tokens=%s", request_id,
                     prepared.token_count, body.max_tokens)

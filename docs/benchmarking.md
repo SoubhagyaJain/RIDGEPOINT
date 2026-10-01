@@ -25,3 +25,9 @@ Phase 1 E1 runs only measure isolated GPU operations. Windows/WDDM, short durati
 The trace generator writes LF-delimited JSONL bytes and a SHA-256 manifest; the replayer refuses a trace whose bytes no longer match its manifest. The replayer records scheduled and actual send times, every SSE token arrival, the final server usage, request ID, response status, and errors. The analyzer calculates the definitions above from raw records. It marks clock-trace availability and sample-size limitations explicitly.
 
 The six-request V0 smoke trace is reproducible but too small for a P95/P99 performance claim. Three repeats show spread; they do not satisfy the headline trial/sample/clock rules. The 500-stream null stress is a harness check; its deliberately delayed first token makes goodput zero by design, and its send-lag P99 on this Windows host exceeded 5 ms. These observations are recorded rather than silently discarded.
+
+## Phase 3 same-trace comparison
+
+V0, V1 with batch size one, and V1 with a 10 ms/four-request window replayed the exact same 24-request token-ID trace three times each. The run manifests share one trace SHA-256 and one source-tree SHA-256. The final SSE event records the actual batch size, so the analysis can distinguish a configured maximum from batches that formed. `experiments/V1-batching/analyze.py` recomputes the nine-row table from ignored raw records.
+
+The comparison is exploratory. The 24-request sample cannot support P99 claims, several client send-lag P99 values exceeded 5 ms, and there is no continuous SM clock/temperature trace. V1 timing varied sharply between repeats on this Windows host. The observed batch membership and latency differences show that the batching mechanism ran; they do not establish a valid capacity or causal speedup claim. See `results/summaries/phase3-v1.md`.

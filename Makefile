@@ -1,4 +1,4 @@
-.PHONY: setup test lint gpu-check bench-smoke memory-budget download-model serve-v0 serve-null trace-smoke replay-smoke analyze-smoke
+.PHONY: setup test lint gpu-check bench-smoke memory-budget download-model serve-v0 serve-v1 serve-v1-single serve-null trace-smoke replay-smoke analyze-smoke trace-phase3 compare-phase3
 
 setup:
 	uv sync --frozen --group dev
@@ -24,6 +24,12 @@ download-model:
 serve-v0:
 	uv run --frozen uvicorn ridgepoint.server.app:app --host 127.0.0.1 --port 8000
 
+serve-v1:
+	uv run --frozen uvicorn ridgepoint.server.v1:app --host 127.0.0.1 --port 8002
+
+serve-v1-single:
+	RIDGEPOINT_V1_CONFIG=configs/engine/v1-single.yaml uv run --frozen uvicorn ridgepoint.server.v1:app --host 127.0.0.1 --port 8002
+
 serve-null:
 	uv run --frozen uvicorn bench.backends.null:app --host 127.0.0.1 --port 8001
 
@@ -35,3 +41,9 @@ replay-smoke:
 
 analyze-smoke:
 	uv run --frozen python -m bench.analyze.metrics results/raw/v0-chat-smoke.jsonl --duration-s 20 --warmup-s 0
+
+trace-phase3:
+	uv run --frozen python -m bench.workloads.generate --workload configs/workloads/chat.yaml --output results/raw/phase3-overlap.jsonl --duration-s 20 --rate-rps 2 --warmup-s 0 --max-requests 24 --prompt-tokens 64 --output-tokens 16
+
+compare-phase3:
+	uv run --frozen python experiments/V1-batching/analyze.py
