@@ -105,6 +105,25 @@ def test_greedy_token_sequence_matches_reference(reference):
                                         torch.tensor([True], device="cuda"))
 
 
+@pytest.mark.filterwarnings("ignore:Synchronization debug mode")
+def test_decode_layer_loop_never_syncs_host(reference, monkeypatch):
+    _, runtime = reference
+    layer = runtime._layer
+
+    def guarded(*args, **kwargs):
+        torch.cuda.set_sync_debug_mode("error")
+        try:
+            return layer(*args, **kwargs)
+        finally:
+            torch.cuda.set_sync_debug_mode("default")
+
+    with torch.inference_mode():
+        cache, logits = runtime.prefill([list(range(101, 165)), list(range(201, 265))], [4, 4])
+        monkeypatch.setattr(runtime, "_layer", guarded)
+        runtime.decode(logits.argmax(dim=-1), cache, torch.tensor([True, True], device="cuda"))
+        assert cache.lengths.tolist() == [65, 65]
+
+
 def test_v1_http_stream_batches_two_requests(reference):
     backend, runtime = reference
 

@@ -67,20 +67,18 @@ class Qwen2Runtime:
                         capacity=capacity, head_dim=self.head_dim,
                         element_bytes=torch.empty((), dtype=self.dtype).element_size())
 
-    def _rope(self, q: torch.Tensor, k: torch.Tensor,
-              positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _rope_table(self, positions: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         # Match Qwen2's float32 RoPE frequency calculation and BF16 output.
         freq = positions.float().unsqueeze(-1) * self.inv_freq
         angle = torch.cat((freq, freq), dim=-1)
-        cos = angle.cos().to(q.dtype).unsqueeze(1)
-        sin = angle.sin().to(q.dtype).unsqueeze(1)
-        return q * cos + _rotate_half(q) * sin, k * cos + _rotate_half(k) * sin
+        return (angle.cos().to(self.dtype).unsqueeze(1),
+                angle.sin().to(self.dtype).unsqueeze(1))
 
     def _layer(self, hidden: torch.Tensor, layer, index: int,
-               cache: ContiguousKV, positions: torch.Tensor,
-               mask: torch.Tensor | None, active: torch.Tensor | None = None,
-               decode_key_len: int | None = None) -> torch.Tensor:
+               cache: ContiguousKV, rope: tuple[torch.Tensor, torch.Tensor],
+               mask: torch.Tensor | None, slot: int | None = None) -> torch.Tensor:
         batch, seq_len, _ = hidden.shape
+        cos, sin = rope
         residual = hidden
         normed = _norm(hidden, layer.input_layernorm)
         attn = layer.self_attn
@@ -90,18 +88,18 @@ class Qwen2Runtime:
                                                self.head_dim).transpose(1, 2)
         v = _linear(normed, attn.v_proj).view(batch, seq_len, self.kv_heads,
                                                self.head_dim).transpose(1, 2)
-        q, k = self._rope(q, k, positions)
-        if active is None:
+        q, k = q * cos + _rotate_half(q) * sin, k * cos + _rotate_half(k) * sin
+        if slot is None:
             cache.data[index, 0, :, :, :seq_len, :] = k
             cache.data[index, 1, :, :, :seq_len, :] = v
             key_len = seq_len
         else:
-            rows = torch.arange(batch, device=self.device)[active]
-            slots = cache.lengths[active]
-            cache.data[index, 0, rows, :, slots, :] = k[active, :, 0, :]
-            cache.data[index, 1, rows, :, slots, :] = v[active, :, 0, :]
-            assert decode_key_len is not None
-            key_len = decode_key_len
+            # Every row of a decode call shares one slot. A plain integer index
+            # stays on the GPU queue; boolean-mask indexing here would force a
+            # host sync in every layer.
+            cache.data[index, 0, :, :, slot, :] = k[:, :, 0, :]
+            cache.data[index, 1, :, :, slot, :] = v[:, :, 0, :]
+            key_len = slot + 1
         keys = cache.data[index, 0, :, :, :key_len, :]
         values = cache.data[index, 1, :, :, :key_len, :]
         use_gqa = self.groups > 1
@@ -110,7 +108,7 @@ class Qwen2Runtime:
             values = values.repeat_interleave(self.groups, dim=1)
         output = F.scaled_dot_product_attention(
             q, keys, values, attn_mask=mask, dropout_p=0.0,
-            is_causal=active is None and mask is None and seq_len > 1,
+            is_causal=slot is None and mask is None and seq_len > 1,
             enable_gqa=use_gqa,
         )
         output = output.transpose(1, 2).reshape(batch, seq_len, self.hidden_size)
@@ -156,9 +154,10 @@ class Qwen2Runtime:
         mask = (None if bool((lengths == seq_len).all()) else
                 ((key_index <= query_index) &
                  (key_index < lengths[:, None, None]))[:, None, :, :])
+        rope = self._rope_table(positions)
         hidden = F.embedding(ids, self.weights.model.embed_tokens.weight)
         for index, layer in enumerate(self.layers):
-            hidden = self._layer(hidden, layer, index, cache, positions, mask)
+            hidden = self._layer(hidden, layer, index, cache, rope, mask)
         hidden = _norm(hidden, self.weights.model.norm)
         final = hidden[torch.arange(batch, device=self.device), lengths - 1]
         logits = F.linear(final, self.weights.lm_head.weight).float()
@@ -170,11 +169,14 @@ class Qwen2Runtime:
         batch = cache.lengths.numel()
         if input_ids.shape != (batch,) or active.shape != (batch,):
             raise ValueError("decode input and active mask must match cache batch")
-        if batch > 1 and (not bool(active.all()) or
-                          not bool((cache.lengths == cache.lengths[0]).all())):
+        # Read host-side state once per step; the layer loop then queues GPU work
+        # without waiting on it.
+        lengths = cache.lengths.tolist()
+        live = active.tolist()
+        if not all(live) or len(set(lengths)) > 1:
             rows = []
             for row in range(batch):
-                if bool(active[row]):
+                if live[row] and batch > 1:
                     view = ContiguousKV(cache.data[:, :, row:row + 1],
                                         cache.lengths[row:row + 1])
                     rows.append(self.decode(input_ids[row:row + 1], view,
@@ -183,18 +185,13 @@ class Qwen2Runtime:
                     rows.append(torch.zeros((1, self.config.vocab_size),
                                             dtype=torch.float32, device=self.device))
             return torch.cat(rows, dim=0)
-        if bool((cache.lengths[active] >= cache.capacity).any()):
+        slot = lengths[0]
+        if slot >= cache.capacity:
             raise ValueError("KV capacity exceeded")
-        positions = cache.lengths[:, None]
-        key_len = int(cache.lengths.max().item()) + 1
-        keys = torch.arange(key_len, device=self.device)[None, :]
-        allowed = keys <= cache.lengths[:, None]
-        mask = (None if bool(active.all()) and bool((cache.lengths == key_len - 1).all())
-                else allowed[:, None, None, :])
+        rope = self._rope_table(cache.lengths[:, None])
         hidden = F.embedding(input_ids[:, None], self.weights.model.embed_tokens.weight)
         for index, layer in enumerate(self.layers):
-            hidden = self._layer(hidden, layer, index, cache, positions, mask, active,
-                                 decode_key_len=key_len)
-        cache.lengths += active.long()
+            hidden = self._layer(hidden, layer, index, cache, rope, None, slot)
+        cache.lengths += 1
         hidden = _norm(hidden, self.weights.model.norm)[:, 0, :]
         return F.linear(hidden, self.weights.lm_head.weight).float()

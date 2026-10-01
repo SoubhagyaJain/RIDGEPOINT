@@ -13,4 +13,6 @@ server three times and analyze with:
 uv run --frozen python experiments/V1-batching/analyze.py
 ```
 
-The script verifies common trace and source hashes before printing the table.
+The script verifies common trace and source hashes before printing the table. It reads
+`phase3-final-*` by default; pass another run-set prefix as the first argument, for
+example `analyze.py phase3-pin` for the pinned post-fix rerun.

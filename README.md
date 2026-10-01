@@ -50,7 +50,7 @@ uv run --frozen uvicorn ridgepoint.server.v1:app --host 127.0.0.1 --port 8002
 
 In another terminal, use `uv run --frozen python -m bench.client.demo --url http://127.0.0.1:8002/v1/completions --max-tokens 16`. To disable batching, set `RIDGEPOINT_V1_CONFIG=configs/engine/v1-single.yaml` for the server process. On PowerShell use `$env:RIDGEPOINT_V1_CONFIG='configs/engine/v1-single.yaml'` before starting it. The client-facing endpoint and SSE events are the same as V0. V1 adds batch size and prefill/decode timing to the final event. A request that cannot pass the contiguous-KV headroom check receives HTTP 503 before streaming.
 
-The Phase 3 comparison replays one fixed 24-request trace against V0 and both V1 settings. See [the Phase 3 result](results/summaries/phase3-v1.md) for exact commands, raw-run filenames, measurements, and validity limits. The Windows measurements do not support a headline throughput claim.
+The Phase 3 comparison replays one fixed 24-request trace against V0 and both V1 settings. See [the Phase 3 result](results/summaries/phase3-v1.md) for exact commands, raw-run filenames, measurements, and validity limits. The Windows measurements do not support a headline throughput claim. A follow-up removed 113 host syncs per decode step from V1 and found that CPU-core placement changes every engine's speed; the reruns are in the same result file and in section 9 of the Phase 3 report.
 
 ## Read the work
 

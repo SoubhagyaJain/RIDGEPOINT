@@ -13,6 +13,8 @@ from bench.analyze.metrics import analyze
 
 
 def main() -> None:
+    # Optional run-set prefix, e.g. `analyze.py phase3-fix` for the post-fix rerun.
+    prefix = sys.argv[1] if len(sys.argv) > 1 else "phase3-final"
     raw = Path("results/raw")
     trace_hashes = set()
     source_hashes = set()
@@ -21,7 +23,7 @@ def main() -> None:
     print("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
     for engine in ("v0", "v1-single", "v1-batch"):
         for trial in (1, 2, 3):
-            path = raw / f"phase3-final-{engine}-{trial}.jsonl"
+            path = raw / f"{prefix}-{engine}-{trial}.jsonl"
             records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
             manifest = json.loads(path.with_suffix(".manifest.json").read_text(encoding="utf-8"))
             trace_hashes.add(manifest["trace_sha256"])
